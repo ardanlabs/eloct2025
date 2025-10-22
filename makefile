@@ -8,6 +8,9 @@ run:
 run-help:
 	go run api/services/sales/main.go --help
 
+curl:
+	curl -i http://localhost:3000/test
+
 # ==============================================================================
 # Define dependencies
 
