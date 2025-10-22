@@ -10,7 +10,7 @@ import (
 )
 
 func WebAPI(log *logger.Logger) *web.App {
-	app := web.NewApp(log.Info, mid.Logger(log), mid.Errors(log))
+	app := web.NewApp(log.Info, mid.Logger(log), mid.Errors(log), mid.Panics())
 
 	app.HandleFunc("/test", testapp.Test)
 
