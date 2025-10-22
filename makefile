@@ -11,6 +11,9 @@ run-help:
 curl:
 	curl -i http://localhost:3000/test
 
+curl-auth:
+	curl -i -H "Authorization: Bearer ${TOKEN}" http://localhost:3000/testauth
+
 hack:
 	go run api/tooling/hack/main.go
 
