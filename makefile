@@ -11,6 +11,9 @@ run-help:
 curl:
 	curl -i http://localhost:3000/test
 
+hack:
+	go run api/tooling/hack/main.go
+
 # ==============================================================================
 # Define dependencies
 
