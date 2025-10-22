@@ -8,16 +8,24 @@ import (
 	"github.com/google/uuid"
 )
 
-type HandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request) error
+type Logger func(ctx context.Context, msg string, args ...any)
+
+type Encoder interface {
+	Encode() (data []byte, contentType string, err error)
+}
+
+type HandlerFunc func(ctx context.Context, r *http.Request) Encoder
 
 type App struct {
 	*http.ServeMux
-	mw []MidFunc
+	log Logger
+	mw  []MidFunc
 }
 
-func NewApp(mw ...MidFunc) *App {
+func NewApp(log Logger, mw ...MidFunc) *App {
 	return &App{
 		ServeMux: http.NewServeMux(),
+		log:      log,
 		mw:       mw,
 	}
 }
@@ -32,7 +40,12 @@ func (a *App) HandleFunc(pattern string, handlerFunc HandlerFunc, mw ...MidFunc)
 
 		// DO WHAT I WANT
 
-		handlerFunc(ctx, w, r)
+		resp := handlerFunc(ctx, r)
+
+		if err := Respond(ctx, w, resp); err != nil {
+			a.log(ctx, "web-respond", "ERROR", err)
+			return
+		}
 
 		// DO WHAT I WANT
 	}
