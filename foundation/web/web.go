@@ -10,24 +10,29 @@ type HandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Reques
 
 type App struct {
 	*http.ServeMux
+	mw []MidFunc
 }
 
-func NewApp() *App {
+func NewApp(mw ...MidFunc) *App {
 	return &App{
 		ServeMux: http.NewServeMux(),
+		mw:       mw,
 	}
 }
 
 // HandleFunc IS MY API.
-func (app *App) HandleFunc(pattern string, handler HandlerFunc) {
+func (a *App) HandleFunc(pattern string, handlerFunc HandlerFunc, mw ...MidFunc) {
+	handlerFunc = wrapMiddleware(mw, handlerFunc)
+	handlerFunc = wrapMiddleware(a.mw, handlerFunc)
+
 	h := func(w http.ResponseWriter, r *http.Request) {
 
 		// DO WHAT I WANT
 
-		handler(r.Context(), w, r)
+		handlerFunc(r.Context(), w, r)
 
 		// DO WHAT I WANT
 	}
 
-	app.ServeMux.HandleFunc(pattern, h)
+	a.ServeMux.HandleFunc(pattern, h)
 }
