@@ -121,7 +121,7 @@ func genToken() error {
 	}
 
 	input := map[string]any{
-		"Key":   pubData,
+		"Key":   string(pubData),
 		"Token": str,
 		"ISS":   "ardan labs",
 	}
