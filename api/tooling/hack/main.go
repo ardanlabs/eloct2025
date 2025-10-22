@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	_ "embed"
 	"encoding/pem"
 	"fmt"
 	"log"
@@ -11,6 +13,16 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/open-policy-agent/opa/v1/rego"
+)
+
+// Core OPA policies.
+var (
+	//go:embed rego/authentication.rego
+	regoAuthentication string
+
+	//go:embed rego/authorization.rego
+	regoAuthorization string
 )
 
 func main() {
@@ -49,6 +61,7 @@ func genToken() error {
 	}
 
 	token := jwt.NewWithClaims(method, claims)
+	token.Header["kid"] = "123"
 
 	// -------------------------------------------------------------------------
 
@@ -71,6 +84,76 @@ func genToken() error {
 
 	fmt.Println("\nOUR TOKEN:")
 	fmt.Println(str)
+
+	// -------------------------------------------------------------------------
+
+	// VERIFICATION SIDE
+
+	parser := jwt.NewParser(jwt.WithValidMethods([]string{jwt.SigningMethodRS256.Name}))
+
+	var clms Claims
+	tkn, _, err := parser.ParseUnverified(str, &clms)
+	if err != nil {
+		return fmt.Errorf("error parsing token: %w", err)
+	}
+
+	kidRaw, exists := tkn.Header["kid"]
+	if !exists {
+		return fmt.Errorf("KID MISSING")
+	}
+
+	kid, ok := kidRaw.(string)
+	if !ok {
+		return fmt.Errorf("KID MALFORMED")
+	}
+
+	fmt.Println("KID: ", kid)
+
+	// -------------------------------------------------------------------------
+
+	// USED THE KID TO FIND THE PUBLIC KEY
+
+	// OPA
+
+	pubData, err := os.ReadFile("public.pem")
+	if err != nil {
+		return err
+	}
+
+	input := map[string]any{
+		"Key":   pubData,
+		"Token": str,
+		"ISS":   "ardan labs",
+	}
+
+	query := fmt.Sprintf("x = data.%s.%s", "ardan.rego", "auth")
+
+	ctx := context.Background()
+
+	q, err := rego.New(
+		rego.Query(query),
+		rego.Module("policy.rego", regoAuthentication),
+	).PrepareForEval(ctx)
+	if err != nil {
+		return fmt.Errorf("OPA prepare for eval failed for rule %q: %w", "auth", err)
+	}
+
+	results, err := q.Eval(ctx, rego.EvalInput(input))
+	if err != nil {
+		return fmt.Errorf("OPA eval failed for rule %q: %w", "auth", err)
+	}
+
+	if len(results) == 0 {
+		return fmt.Errorf("OPA policy evaluation for rule yielded no results")
+	}
+
+	result, ok := results[0].Bindings["x"].(bool)
+	if !ok || !result {
+		fmt.Println("OPA policy evaluation details", "rule", "auth", "results", results, "ok", ok)
+		return fmt.Errorf("OPA policy rule not satisfied")
+	}
+
+	fmt.Println("TOKEN SIG VERIFIED")
 
 	return nil
 }
