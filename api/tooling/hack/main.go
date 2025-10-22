@@ -52,6 +52,48 @@ func genToken() error {
 
 	claims := Claims{
 		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   "9649cf5c-9da6-45c4-97a9-48c78b8ad8db",
+			Issuer:    "service project",
+			ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(8760 * time.Hour)),
+			IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
+		},
+		Roles: []string{"ADMIN"},
+	}
+
+	token := jwt.NewWithClaims(method, claims)
+	token.Header["kid"] = "54bb2165-71e1-41a6-af3e-7da4a0e1e2c1"
+
+	data, err := os.ReadFile("zarf/keys/54bb2165-71e1-41a6-af3e-7da4a0e1e2c1.pem")
+	if err != nil {
+		return err
+	}
+
+	privateKey, err := jwt.ParseRSAPrivateKeyFromPEM(data)
+	if err != nil {
+		return fmt.Errorf("parsing private key from PEM: %w", err)
+	}
+
+	str, err := token.SignedString(privateKey)
+	if err != nil {
+		return fmt.Errorf("signing token: %w", err)
+	}
+
+	fmt.Println("\nOUR TOKEN:")
+	fmt.Println(str)
+
+	return nil
+}
+
+func genTokenHack() error {
+	method := jwt.GetSigningMethod(jwt.SigningMethodRS256.Name)
+
+	type Claims struct {
+		jwt.RegisteredClaims
+		Roles []string `json:"roles"`
+	}
+
+	claims := Claims{
+		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   "123456789",
 			Issuer:    "ardan labs",
 			ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(8760 * time.Hour)),
