@@ -8,6 +8,9 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
+
+	"github.com/golang-jwt/jwt/v4"
 )
 
 func main() {
@@ -20,9 +23,54 @@ func run() error {
 	// openssl genpkey -algorithm RSA -out private.pem -pkeyopt rsa_keygen_bits:2048
 	// openssl rsa -pubout -in private.pem -out public.pem
 
-	if err := genKey(); err != nil {
+	if err := genToken(); err != nil {
 		return err
 	}
+
+	return nil
+}
+
+func genToken() error {
+	method := jwt.GetSigningMethod(jwt.SigningMethodRS256.Name)
+
+	type Claims struct {
+		jwt.RegisteredClaims
+		Roles []string `json:"roles"`
+	}
+
+	claims := Claims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   "123456789",
+			Issuer:    "ardan labs",
+			ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(8760 * time.Hour)),
+			IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
+		},
+		Roles: []string{"ADMIN"},
+	}
+
+	token := jwt.NewWithClaims(method, claims)
+
+	// -------------------------------------------------------------------------
+
+	data, err := os.ReadFile("private.pem")
+	if err != nil {
+		return err
+	}
+
+	privateKey, err := jwt.ParseRSAPrivateKeyFromPEM(data)
+	if err != nil {
+		return fmt.Errorf("parsing private key from PEM: %w", err)
+	}
+
+	// -------------------------------------------------------------------------
+
+	str, err := token.SignedString(privateKey)
+	if err != nil {
+		return fmt.Errorf("signing token: %w", err)
+	}
+
+	fmt.Println("\nOUR TOKEN:")
+	fmt.Println(str)
 
 	return nil
 }
