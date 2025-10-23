@@ -34,16 +34,37 @@ type Storer interface {
 	QueryByEmail(ctx context.Context, email mail.Address) (User, error)
 }
 
+type ExtBusiness interface {
+	Create(ctx context.Context, actorID uuid.UUID, nu NewUser) (User, error)
+	Update(ctx context.Context, actorID uuid.UUID, usr User, uu UpdateUser) (User, error)
+	Delete(ctx context.Context, actorID uuid.UUID, usr User) error
+	Query(ctx context.Context, filter QueryFilter, orderBy order.By, page page.Page) ([]User, error)
+	Count(ctx context.Context, filter QueryFilter) (int, error)
+	QueryByID(ctx context.Context, userID uuid.UUID) (User, error)
+	QueryByEmail(ctx context.Context, email mail.Address) (User, error)
+}
+
+type Extension func(ExtBusiness) ExtBusiness
+
 type Business struct {
 	log    *logger.Logger
 	storer Storer
 }
 
-func NewBusiness(log *logger.Logger, storer Storer) *Business {
-	return &Business{
+func NewBusiness(log *logger.Logger, storer Storer, extensions ...Extension) ExtBusiness {
+	b := ExtBusiness(&Business{
 		log:    log,
 		storer: storer,
+	})
+
+	for i := len(extensions) - 1; i >= 0; i-- {
+		ext := extensions[i]
+		if ext != nil {
+			b = ext(b)
+		}
 	}
+
+	return b
 }
 
 func (b *Business) Create(ctx context.Context, actorID uuid.UUID, nu NewUser) (User, error) {
